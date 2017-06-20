@@ -23,98 +23,90 @@ func newLoginHandler() *loginHandler {
 	}
 }
 
-func (lh *loginHandler) registerMessage () {
-	proto.RegisterLoginMsg(lh.mc)
-}
+func (lh *loginHandler) init() error {
 
-func (lh *loginHandler) register2remote(conn net.Conn) error {
-	codec := proto.NewCodec(lh.mc, 1, conn, 0)
-	if err := codec.SendMsg(proto.Cmd_Register_Server, &proto.MsgRegisterServer{Type:1, Id:lh.ServerId}); err != nil {
-		fmt.Println("send register err", err)
+	proto.RegisterLoginMsg(lh.mc)
+
+	if err := lh.connectGateway(); err != nil {
+		lh.close()
 		return err
 	}
-	msg, err := codec.Receive()
+
+	return nil
+}
+
+func (lh *loginHandler) close() {
+	fmt.Println("login handler close")
+	lh.session.Close()
+}
+
+func (lh *loginHandler) start() error {
+	for {
+		imsg, err := lh.session.Receive()
+		if err != nil {
+			return err
+		}
+
+		msg, ok := imsg.(*proto.Message)
+		if !ok {
+			return errors.New("login handler cast *Message err")
+		}
+
+		if err := lh.handleMessage(int(msg.Cmd), &msg.Msg); err != nil {
+			return err
+		}
+	}
+}
+
+func (lh *loginHandler) connectGateway() error {
+	conn, err := net.Dial("tcp", lh.GatewayAddr)
 	if err != nil {
 		return err
 	}
 
-	imsg, ok := msg.(*proto.Message)
-	if !ok {
-		return errors.New("convert message error")
+	codec := proto.NewCodec(lh.mc, uint32(lh.ServerId), conn.(net.Conn), lh.RecvBuffSize)
+	lh.session = netlink.NewSession(codec, lh.SendChSize)
+
+	if err := lh.register2remote(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (lh *loginHandler) register2remote() error {
+
+	if err := lh.SendMsg(proto.Cmd_Register_Server, &proto.MsgRegisterServer{Type: 1, Id: lh.ServerId}); err != nil {
+		return err
 	}
 
-	rsmsg, ok := imsg.Msg.(*proto.MsgRegiserServerRes)
-	if !ok {
-		return errors.New("assert type register server msg error")
+	data, err := lh.session.Receive()
+	if err != nil {
+		return err
 	}
 
-	fmt.Println("register server res ", rsmsg)
+	imsg, ok := data.(*proto.Message)
+	if !ok {
+		return errors.New("login handler cast *Message err")
+	}
 
-	if !rsmsg.Success {
+	msg, ok := imsg.Msg.(*proto.MsgRegiserServerRes)
+	if !ok {
+		return errors.New("login handler cast *MsgregiserServerRes err")
+	}
+
+	fmt.Println("register res ", msg)
+	if !msg.Success {
 		return errors.New("cannot register login handler to gateway")
 	}
 
 	return nil
 }
 
-func (lh *loginHandler) connectGateway(addr string) error {
 
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		return err
-	}
+func (lh *loginHandler) SendMsg(cmd int, data interface{}) error {
+	return lh.session.Send(&proto.Message{Cmd: uint32(cmd), Msg: data})
+}
 
-	codec := proto.NewCodec(lh.mc, 1, conn.(net.Conn), lh.RecvBuffSize)
-	lh.session = netlink.NewSession(codec, lh.SendChSize)
-
-	if err := lh.register2remote(conn); err != nil {
-		conn.Close()
-		return err
-	}
-
+func (lh *loginHandler) handleMessage(cmd int, data *interface{}) error {
 	return nil
-}
-
-func (lh *loginHandler) Start(addr string) error {
-	lh.registerMessage()
-
-	if err := lh.connectGateway(addr); err != nil {
-		return err
-	}
-
-
-	go lh.handle(lh.session)
-
-	return nil
-}
-
-func (lh *loginHandler) Send(cmd int, data interface{}) {
-	lh.session.Send(&proto.Message{Cmd: uint32(cmd), Msg: data})
-}
-
-func (lh *loginHandler) handle(session *netlink.Session) {
-	defer func() {
-		lh.session.Close()
-	}()
-
-
-	fmt.Println("login hander run")
-
-	for {
-		imsg, err := session.Receive()
-		if err != nil {
-			return
-		}
-
-		msg, ok := imsg.(*proto.Message)
-		if !ok {
-			return
-		}
-
-		lh.handleMessage(int(msg.Cmd), &msg.Msg)
-	}
-}
-
-func (lh *loginHandler) handleMessage(cmd int, data *interface{}) {
-
 }

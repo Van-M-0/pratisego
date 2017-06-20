@@ -27,36 +27,6 @@ func (gw *GateWay) Stop() {
 
 }
 
-/*
-func (gw *GateWay) StartClientTest() {
-	clientWait := new(sync.WaitGroup)
-	clientWait.Add(1)
-	for i := 0; i < 1; i++ {
-		clientWait.Add(1)
-		go func() {
-			session, err := netlink.Dial("tcp",  "127.0.0.1:8899", netlink.ProtocolFunc(func (rw io.ReadWriter) (netlink.Codec, error) {
-				return gw.ClientCodec(rw)
-			}), 0)
-			fmt.Println("create session errr", err)
-
-			t := proto.TestData{A:10086}
-
-			d := proto.Message{Cmd:100, Msg: t}
-			err = session.Send(&d)
-			fmt.Println("client send message ", d, err)
-
-
-			m2, err := session.Receive()
-			fmt.Println("Message Message ", m2, err)
-
-			session.Close()
-			clientWait.Done()
-		}()
-	}
-	clientWait.Wait()
-}
-*/
-
 func (gw *GateWay) Start() {
 
 	gw.registerMessage()
@@ -87,20 +57,11 @@ func (gw *GateWay) clientInit(io io.ReadWriter) (netlink.Codec, error) {
 }
 
 func (gw *GateWay) handleClientSession(session *netlink.Session) {
-	defer session.Close()
-
-	fmt.Println("server start")
-	for {
-		_, err := session.Receive()
-		if err != nil {
-			return
-		}
-
-		//err = session.Send(&d)
-		if err != nil {
-			return
-		}
+	ch := newClientHandler(session, gw)
+	if ch.init() != nil {
+		fmt.Println("init client handler err")
 	}
+	ch.start()
 }
 
 func (gw *GateWay) StartClients(ln net.Listener, cfg *conf.GatewayCfg) {
@@ -116,52 +77,19 @@ func (gw *GateWay) StartClients(ln net.Listener, cfg *conf.GatewayCfg) {
 	go gw.cliser.Serve()
 }
 
-func (gw *GateWay) serverInit(io io.ReadWriter) (netlink.Codec, error) {
-
-	conn := io.(net.Conn)
-	codec := proto.NewCodec(gw.mc, 1, conn, 0)
-
-	msg, err := codec.Receive()
-	if err != nil {
-		conn.Close()
-		return nil, nil
-	}
-
-	amsg, ok := msg.(*proto.Message)
-	if !ok {
-		conn.Close()
-		return nil, nil
-	}
-
-	rsmsg, ok := amsg.Msg.(*proto.MsgRegisterServer)
-	if !ok {
-		conn.Close()
-		return nil, nil
-	}
-
-	ep := &ServerEndpoint{
-		Id: rsmsg.Id,
-		Type: rsmsg.Type,
-	}
-	if err := gw.serEpList.Add(ep); err != nil {
-		codec.SendMsg(proto.Cmd_Register_Server_Res, &proto.MsgRegiserServerRes{Success: false})
-		return nil, err
-	}
-
-	codec.SendMsg(proto.Cmd_Register_Server_Res, &proto.MsgRegiserServerRes{Success: true})
-
-	return proto.NewCodec(gw.mc, uint32(ep.Id), conn, 1024), nil
-}
-
 func (gw *GateWay) handleServerSession(session *netlink.Session) {
-
+	sh := newServerHandler(session, gw)
+	if sh.init() != nil {
+		return
+	}
+	sh.start()
 }
 
 func (gw *GateWay) StartServers(ln net.Listener, cfg *conf.GatewayCfg) {
 	gw.serser = netlink.NewServer(
 		ln,
 		netlink.ProtocolFunc(func (rw io.ReadWriter) (netlink.Codec, error) {
-			return gw.serverInit(rw)
+			return proto.NewCodec(gw.mc, uint32(0), rw.(net.Conn), 1024), nil
 		}),
 		cfg.ServerSendChSize,
 		netlink.HandlerFunc(func(session *netlink.Session) {

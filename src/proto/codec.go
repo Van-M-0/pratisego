@@ -43,6 +43,10 @@ func NewCodec(mc *MessageCenter, id uint32, conn net.Conn, bufferSize int) *Code
 	return c
 }
 
+func (c *Codec) SetID(id uint32) {
+	c.id = id
+}
+
 func (c *Codec) Receive() (interface{}, error) {
 	if _, err := io.ReadFull(c.conn, c.headBuf); err != nil {
 		return nil, err
