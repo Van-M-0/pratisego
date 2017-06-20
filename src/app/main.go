@@ -2,9 +2,10 @@ package main
 
 import (
 	"gateway"
-	"time"
 	"login"
 	"sync"
+	"os"
+	"fmt"
 )
 
 /*
@@ -78,13 +79,18 @@ func main() {
 
 func main() {
 
-	gw := gateway.NewGateway()
-	gw.Start()
-
-	time.Sleep(2*time.Second)
-
-	ls := login.NewLoginServer()
-	ls.Start()
+	serverType := os.Args[1]
+	if serverType == "gate" {
+		fmt.Print("gate start")
+		gw := gateway.NewGateway()
+		gw.Start()
+	} else if serverType == "login" {
+		fmt.Println("login start")
+		ls := login.NewLoginServer()
+		ls.Start()
+	} else {
+		fmt.Println("null start")
+	}
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)

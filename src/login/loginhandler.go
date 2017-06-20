@@ -40,7 +40,7 @@ func (lh *loginHandler) register2remote(conn net.Conn) error {
 
 	imsg, ok := msg.(*proto.Message)
 	if !ok {
-		return errors.New("conver message error")
+		return errors.New("convert message error")
 	}
 
 	rsmsg, ok := imsg.Msg.(*proto.MsgRegiserServerRes)
