@@ -28,4 +28,7 @@ type MsgRegiserServerRes struct {
 	Success 	bool
 }
 
-
+func RegisterCommonMsg(mc *MessageCenter) {
+	mc.Register(Cmd_Register_Server, &MsgRegisterServer{})
+	mc.Register(Cmd_Register_Server_Res, &MsgRegiserServerRes{})
+}

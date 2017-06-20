@@ -64,7 +64,7 @@ func (c *Codec) Receive() (interface{}, error) {
 		return nil, err
 	}
 	err = msgpack.Unmarshal(buf, &msg)
-	return &msg, err
+	return &Message{Cmd:cmd, Msg:msg}, err
 }
 
 func (c *Codec) Send(i interface{}) error {
@@ -92,6 +92,14 @@ func (c *Codec) Send(i interface{}) error {
 	totalLen := SizeOfHeaderLen + len(buf)
 	_, err = c.conn.Write(c.sendBuf[:totalLen])
 	return err
+}
+
+func (c *Codec) SendMsg(cmd uint32, i interface{}) error {
+	msg := &Message{
+		Cmd: cmd,
+		Msg: i,
+	}
+	return c.Send(msg)
 }
 
 func (c *Codec) Close() error {

@@ -5,6 +5,7 @@ import (
 	"net"
 	"proto"
 	"errors"
+	"fmt"
 )
 
 type loginHandler struct {
@@ -18,27 +19,36 @@ type loginHandler struct {
 
 func newLoginHandler() *loginHandler {
 	return &loginHandler{
-
+		mc: proto.NewMessageCenter(),
 	}
 }
 
 func (lh *loginHandler) registerMessage () {
-
+	proto.RegisterLoginMsg(lh.mc)
 }
 
 func (lh *loginHandler) register2remote(conn net.Conn) error {
 	codec := proto.NewCodec(lh.mc, 1, conn, 0)
-	codec.Send(&proto.MsgRegisterServer{Type:1, Id:lh.ServerId})
-
+	if err := codec.SendMsg(proto.Cmd_Register_Server, &proto.MsgRegisterServer{Type:1, Id:lh.ServerId}); err != nil {
+		fmt.Println("send register err", err)
+		return err
+	}
 	msg, err := codec.Receive()
 	if err != nil {
 		return err
 	}
 
-	rsmsg, ok := msg.(*proto.MsgRegiserServerRes)
+	imsg, ok := msg.(*proto.Message)
+	if !ok {
+		return errors.New("conver message error")
+	}
+
+	rsmsg, ok := imsg.Msg.(*proto.MsgRegiserServerRes)
 	if !ok {
 		return errors.New("assert type register server msg error")
 	}
+
+	fmt.Println("register server res ", rsmsg)
 
 	if !rsmsg.Success {
 		return errors.New("cannot register login handler to gateway")
@@ -72,6 +82,7 @@ func (lh *loginHandler) Start(addr string) error {
 		return err
 	}
 
+
 	go lh.handle(lh.session)
 
 	return nil
@@ -85,6 +96,9 @@ func (lh *loginHandler) handle(session *netlink.Session) {
 	defer func() {
 		lh.session.Close()
 	}()
+
+
+	fmt.Println("login hander run")
 
 	for {
 		imsg, err := session.Receive()

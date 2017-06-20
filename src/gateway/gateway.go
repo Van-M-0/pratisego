@@ -6,7 +6,6 @@ import (
 	"netlink"
 	"io"
 	"proto"
-	"sync"
 	"fmt"
 )
 
@@ -21,7 +20,7 @@ type GateWay struct {
 func (gw *GateWay) registerMessage() {
 	gw.mc = proto.NewMessageCenter()
 
-	gw.mc.Register(100, &proto.TestData{})
+	proto.RegisterGatewayMsg(gw.mc)
 }
 
 func (gw *GateWay) Stop() {
@@ -81,10 +80,6 @@ func (gw *GateWay) Start() {
 
 	go gw.StartClients(lnc, cfg)
 	go gw.StartServers(lns, cfg)
-
-	w := new(sync.WaitGroup)
-	w.Add(1)
-	w.Wait()
 }
 
 func (gw *GateWay) clientInit(io io.ReadWriter) (netlink.Codec, error) {
@@ -111,7 +106,7 @@ func (gw *GateWay) handleClientSession(session *netlink.Session) {
 func (gw *GateWay) StartClients(ln net.Listener, cfg *conf.GatewayCfg) {
 	gw.cliser = netlink.NewServer(ln,
 		netlink.ProtocolFunc(func (rw io.ReadWriter) (netlink.Codec, error) {
-			return gw.clientInit(io)
+			return gw.clientInit(rw)
 		}),
 		cfg.ClientSendChSize,
 		netlink.HandlerFunc(func(session *netlink.Session) {
@@ -132,10 +127,15 @@ func (gw *GateWay) serverInit(io io.ReadWriter) (netlink.Codec, error) {
 		return nil, nil
 	}
 
-	rsmsg, ok := msg.(*proto.MsgRegisterServer)
+	amsg, ok := msg.(*proto.Message)
 	if !ok {
 		conn.Close()
-		fmt.Println("assert type register server msg error")
+		return nil, nil
+	}
+
+	rsmsg, ok := amsg.Msg.(*proto.MsgRegisterServer)
+	if !ok {
+		conn.Close()
 		return nil, nil
 	}
 
@@ -144,11 +144,11 @@ func (gw *GateWay) serverInit(io io.ReadWriter) (netlink.Codec, error) {
 		Type: rsmsg.Type,
 	}
 	if err := gw.serEpList.Add(ep); err != nil {
-		codec.Send(&proto.MsgRegiserServerRes{Success: false})
+		codec.SendMsg(proto.Cmd_Register_Server_Res, &proto.MsgRegiserServerRes{Success: false})
 		return nil, err
 	}
 
-	codec.Send(&proto.MsgRegiserServerRes{Success: true})
+	codec.SendMsg(proto.Cmd_Register_Server_Res, &proto.MsgRegiserServerRes{Success: true})
 
 	return proto.NewCodec(gw.mc, uint32(ep.Id), conn, 1024), nil
 }

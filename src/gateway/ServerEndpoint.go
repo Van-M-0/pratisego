@@ -27,7 +27,7 @@ func (ep *Endpoint) Add(sep *ServerEndpoint) error {
 	ep.Lock()
 	defer ep.Unlock()
 
-	if _, ok := ep.endpointList[sep.Id]; !ok {
+	if _, ok := ep.endpointList[sep.Id]; ok {
 		return fmt.Errorf("server endpoint id is exists %d", sep.Id)
 	}
 	ep.endpointList[sep.Id] = sep

@@ -2,6 +2,9 @@ package main
 
 import (
 	"gateway"
+	"time"
+	"login"
+	"sync"
 )
 
 /*
@@ -75,8 +78,15 @@ func main() {
 
 func main() {
 
-	msgpack_test()
-
 	gw := gateway.NewGateway()
 	gw.Start()
+
+	time.Sleep(2*time.Second)
+
+	ls := login.NewLoginServer()
+	ls.Start()
+
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	wg.Wait()
 }
