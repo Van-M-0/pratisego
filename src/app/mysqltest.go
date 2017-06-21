@@ -118,15 +118,19 @@ func testcurd() {
 				break
 			}
 
-			rowcount++;
+			rowcount++
 
 			var out bool
 			rows.Scan(&out)
 			fmt.Println("row count ", rowcount, out)
 		}
 
+		//res = dbt.mustExec("update curdtest set value = ? where value = ?", true , false)
 
+		res = dbt.mustExec("delete from curdtest where value = true")
 
+		res = dbt.mustExec("delete from curdtest")
+		fmt.Println(res.RowsAffected())
 	})
 }
 
