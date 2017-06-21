@@ -107,6 +107,13 @@ func (lh *loginHandler) SendMsg(cmd int, data interface{}) error {
 	return lh.session.Send(&proto.Message{Cmd: uint32(cmd), Msg: data})
 }
 
-func (lh *loginHandler) handleMessage(cmd int, data *interface{}) error {
+func (lh *loginHandler) handleMessage(cmd int, data interface{}) error {
+	if cmd == proto.CMD_LOGINLOGIN {
+		lh.userlogin(data.(*proto.MsgLoginLogin))
+	}
 	return nil
+}
+
+func (lh *loginHandler) userlogin(msg *proto.MsgLoginLogin) {
+
 }

@@ -56,6 +56,7 @@ func (sh *serverHandler) close() {
 }
 
 func (sh *serverHandler) start() {
+
 	for {
 		data, err := sh.session.Receive()
 		if err != nil {
@@ -74,6 +75,10 @@ func (sh *serverHandler) start() {
 			return
 		}
 	}
+}
+
+func (lh *serverHandler) SendMsg(cmd int, data interface{}) error {
+	return lh.session.Send(&proto.Message{Cmd: uint32(cmd), Msg: data})
 }
 
 func (sh *serverHandler) handle(cmd uint32, msg interface{}) error {

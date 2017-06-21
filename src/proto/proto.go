@@ -28,7 +28,20 @@ type MsgRegiserServerRes struct {
 	Success 	bool
 }
 
+const Cmd_ServerPing = CMD_common + 3
+type MsgServerPing struct {
+	Ping 			int
+}
+
+const Cmd_ServerPong = CMD_common + 4
+type MsgServerPong struct {
+	Pong 		 	int
+}
+
+
 func RegisterCommonMsg(mc *MessageCenter) {
 	mc.Register(Cmd_Register_Server, &MsgRegisterServer{})
 	mc.Register(Cmd_Register_Server_Res, &MsgRegiserServerRes{})
+	mc.Register(Cmd_ServerPing, &MsgServerPing{})
+	mc.Register(Cmd_ServerPong, &MsgServerPong{})
 }
